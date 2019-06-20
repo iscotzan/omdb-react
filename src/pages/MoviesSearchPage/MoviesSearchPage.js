@@ -1,10 +1,13 @@
 import React, { Component } from 'react'
 import { connect } from 'react-redux';
 
-import { Search, Grid, Card, Segment, Loader, Dimmer, Image, Modal, Header, Button, Rating } from 'semantic-ui-react'
+import { Grid } from 'semantic-ui-react'
 import _ from 'lodash'
 import { GO_GET_MOVIE_DETAILS, GO_SEARCH_MOVIES, GO_SET_SELECTED_MOVIE } from './Movies.actions';
 import './MoviesSearchPage.sass'
+import MovieGrid from './../../components/MovieGrid';
+import MovieModal from './../../components/MovieModal';
+import SearchBar from './../../components/SearchBar';
 
 const initialState = { isLoading: false, results: [], value: '', open: false, selectedMovie: null, fullPlotToggleLoading: false, shortplotmode: true }
 
@@ -60,142 +63,42 @@ class MoviesSearchPage extends Component {
         }
     }
 
-    viewMovie(selectedMovie) {
+    viewMovie() { //reads the Id of the selected movie, opens a modal popup and dispatching the get_movie_details action.
+        const { imdbID } = this.props.moviesdata.data.item;
         this.show('blurring')
-        this.props.GO_GET_MOVIE_DETAILS(selectedMovie.imdbID, 'short')
-    }
-
-    generateMoviesGrid() {
-        const { isLoading } = this.state;
-        const { items } = this.props.moviesdata.data;
-        let movieCards;
-        if (items) {
-
-            movieCards = items.map((item) =>
-                <Card className={"movie-card"} key={item.imdbID} onClick={this.viewMovie.bind(this, item)}>
-                    <Image src={item.Poster !== "N/A" ? item.Poster : "https://via.placeholder.com/300x300.png?text=Sorry,%20No%20Image%20Available"} wrapped ui={false} />
-                    <Card.Content>
-                        <Card.Header>{item.Title}</Card.Header>
-                        <Card.Meta>
-                            <span className='date'>{item.Year}</span>
-                        </Card.Meta>
-                    </Card.Content>
-                </Card>
-            );
-        }
-        //loading?
-        if (isLoading) {
-            return (
-                <Segment className="fullHeight">
-                    <Dimmer active inverted>
-                        <Loader inverted>Loading</Loader>
-                    </Dimmer>
-                    <Grid padded centered >
-                        {movieCards}
-                    </Grid>
-                </Segment>
-            )
-        }
-        return (
-            <Grid centered >
-                {movieCards}
-            </Grid>
-        )
+        this.props.GO_GET_MOVIE_DETAILS(imdbID, 'short')
     }
 
     show = dimmer => this.setState({ ...this.state, dimmer, open: true })
     close = () => this.setState({ ...this.state, open: false, shortplotmode: true })
 
-    toggleGrabFullPlot(id) {
+    toggleGrabFullPlot() {
         // console.log('grabbing the full plot of ', id);
+        const { imdbID } = this.props.moviesdata.data.item;
+
         const plotLength = this.state.shortplotmode ? 'full' : 'short';
         this.setState({ ...this.state, fullPlotToggleLoading: true, shortplotmode: !this.state.shortplotmode })
-        this.props.GO_GET_MOVIE_DETAILS(id, plotLength).then(() => {
+        this.props.GO_GET_MOVIE_DETAILS(imdbID, plotLength).then(() => {
             console.log('movie Data arrived')
             this.setState({ ...this.state, fullPlotToggleLoading: false })
         })
     }
 
-    movieModalContent() { //generates the pop-up modal and its content
-        const { open, dimmer, fullPlotToggleLoading } = this.state;
-        const { isLoading, data } = this.props.moviesdata;
-        const { item } = data;
-        // movie photo, name, year, short
-        // plot, and a button to expand to full plot
-        // console.log('selected movie: ', item);
-        if (isLoading && !fullPlotToggleLoading) {
-            return (
-
-                <Segment className="fullHeight">
-                    <Dimmer inverted active >
-                        <Loader inverted>Loading</Loader>
-                    </Dimmer>
-                </ Segment>
-            )
-
-        }
-        if (!_.isEmpty(item)) {
-            // console.log(item);
-            const { Title, Poster, imdbRating, Plot, Released, Year, imdbID } = item;
-            return (
-                <Modal dimmer={dimmer} open={open} onClose={this.close} closeIcon>
-
-                    <Modal.Header>{Title}</Modal.Header>
-                    <Modal.Content image>
-                        <Image wrapped size='medium' src={Poster !== "N/A" ? Poster : "https://via.placeholder.com/300x300.png?text=Sorry,%20No%20Image%20Available"} />
-
-                        <Modal.Description>
-                            <Header>{Year}</Header>
-                            <Rating icon='star' rating={imdbRating} maxRating={10} disabled />
-                            <br />
-                            <br />
-                            {Plot}
-                            <br />
-                            <br />
-                            <Button basic onClick={this.toggleGrabFullPlot.bind(this, imdbID)} color={"green"} loading={fullPlotToggleLoading}>
-                                {this.state.shortplotmode ? 'Read Full Plot' : 'Read Short Plot'}
-                            </Button>
-                        </Modal.Description>
-                    </Modal.Content>
-                    <Modal.Content className={'date'}>Released: {Released}</Modal.Content>
-
-                </Modal>
-
-            )
-        }
-    }
     render() {
-        const { isLoading, value, results } = this.state
+        const { isLoading, value, results, open, dimmer, fullPlotToggleLoading } = this.state
         // console.log(this.props);
 
         return (
             <Grid stackable doubling centered columns={1} className="fullHeight">
                 <Grid.Column verticalAlign={value !== '' ? 'top' : "middle"} >
                     <Grid.Row className={"searchRow"}>
-
-                        <Search
-                            fluid={value !== '' ? true : false}
-                            className={value !== '' ? "fullWidth" : null}
-                            // aligned='right'
-                            open={false}
-                            size="large"
-                            input={{ icon: 'search', iconPosition: 'left' }}
-                            placeholder='Search Movies..'
-                            loading={isLoading}
-                            onResultSelect={this.handleResultSelect}
-                            onSearchChange={_.debounce(this.handleSearchChange, 500, {
-                                leading: true,
-                            })}
-                            results={results !== undefined ? results : []}
-                            value={value}
-                            autoFocus
-                        />
+                        <SearchBar isLoading={isLoading} value={value} results={results} handleResultSelect={this.handleResultSelect.bind(this)} handleSearchChange={this.handleSearchChange.bind(this)} />
                     </Grid.Row>
                     <Grid.Row>
-                        {this.movieModalContent()}
+                        <MovieModal open={open} close={this.close.bind(this)} dimmer={dimmer} fullPlotToggleLoading={fullPlotToggleLoading} toggleGrabFullPlot={this.toggleGrabFullPlot.bind(this)} shortplotmode={this.state.shortplotmode} />
                     </Grid.Row>
                     <Grid.Row id={"moviesGrid"}>
-                        {results.length > 0 ? this.generateMoviesGrid() : null}
+                        {results.length > 0 ? <MovieGrid isLoading={isLoading} items={this.props.moviesdata.data.items} viewMovie={this.viewMovie.bind(this)} /> : null}
                     </Grid.Row>
                 </Grid.Column>
             </Grid>
